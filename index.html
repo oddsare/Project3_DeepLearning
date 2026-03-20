@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Project 3: Attention and Transformers – Brodie Gilbert</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 960px; margin: 0 auto; padding: 20px 40px; color: #222; }
+    h1 { font-size: 1.8em; border-bottom: 2px solid #333; padding-bottom: 8px; }
+    h2 { font-size: 1.4em; color: #1a1a6e; border-bottom: 1px solid #ccd; padding-bottom: 4px; margin-top: 36px; }
+    h3 { font-size: 1.1em; margin-top: 20px; }
+    p  { line-height: 1.7; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 0.95em; }
+    th { background: #1a1a6e; color: white; padding: 8px 12px; text-align: left; }
+    td { padding: 6px 12px; border-bottom: 1px solid #ddd; }
+    tr:nth-child(even) td { background: #f5f5f5; }
+    .best td { font-weight: bold; background: #e8f5e9 !important; }
+    img { max-width: 100%; border: 1px solid #ccc; margin: 8px 0; }
+    .img-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .img-row img { flex: 1; min-width: 220px; }
+    .note { background: #fff8dc; border-left: 4px solid #f0c040; padding: 8px 14px; margin: 10px 0; font-size: 0.92em; }
+  </style>
+</head>
+<body>
+
+<h1>Project 3: Attention and Transformers</h1>
+<p><strong>Brodie Gilbert</strong> &nbsp;|&nbsp; CSCI Deep Learning &nbsp;|&nbsp; March 2026</p>
+
+<!-- ============================================================ -->
+<h2>Part 1: Basic Attention Mechanism</h2>
+<!-- ============================================================ -->
+
+<h3>Task 1 – Hyperparameter Tuning</h3>
+
+<p>I trained four configurations for 300 epochs. BLEU-4 scores on the test set:</p>
+
+<table>
+  <tr><th>Config</th><th>Embed</th><th>Hidden</th><th>LR</th><th>Dropout</th><th>Examples</th><th>BLEU</th><th>Train Loss</th><th>Val Loss</th></tr>
+  <tr><td>Config 1 – Baseline</td><td>32</td><td>64</td><td>0.005</td><td>0.1</td><td>600</td><td>0.1500</td><td>0.1786</td><td>4.8851</td></tr>
+  <tr><td>Config 2 – Larger Hidden</td><td>64</td><td>128</td><td>0.005</td><td>0.1</td><td>600</td><td>0.1500</td><td>0.1913</td><td>4.8928</td></tr>
+  <tr><td>Config 3 – Low LR / High Dropout</td><td>32</td><td>64</td><td>0.001</td><td>0.3</td><td>600</td><td>0.1000</td><td>0.2605</td><td>4.4204</td></tr>
+  <tr class="best"><td>Config 4 – More Data ★</td><td>32</td><td>64</td><td>0.005</td><td>0.1</td><td>1200</td><td>0.1500</td><td>0.2029</td><td>4.9448</td></tr>
+</table>
+
+<h3>Training and Validation Loss Plots</h3>
+<div class="img-row">
+  <img src="images/Config1_baseline_loss.png"         alt="Config 1 loss"/>
+  <img src="images/Config2_larger_hidden_loss.png"     alt="Config 2 loss"/>
+  <img src="images/Config3_low_lr_high_drop_loss.png"  alt="Config 3 loss"/>
+  <img src="images/Config4_more_data_loss.png"         alt="Config 4 loss"/>
+</div>
+<img src="images/all_configs_train_loss.png" alt="All configs training loss"/>
+
+<h3>Discussion</h3>
+<p>
+  Configs 1, 2, and 4 all scored the same BLEU of 0.1500 on the test set, while
+  Config 3 was the only one that clearly underperformed at 0.1000. Looking at the training
+  curves though, Config 4 (more data) was still the strongest — it had a higher training
+  BLEU during development and lower validation loss, which tells me doubling the data helped
+  even if the final test scores are tied here.
+</p>
+<p>
+  Config 2 (larger hidden) matched Config 1 on BLEU despite having ~4× more parameters.
+  The loss plots show it overfit faster, so the extra capacity didn't actually help on this
+  small dataset.
+</p>
+<p>
+  Config 3 was clearly the weakest (BLEU 0.1000). LR=0.001 was too slow to converge in 300
+  epochs, and dropout=0.3 added too much noise for such a small dataset. Too much
+  regularization ends up hurting more than helping here.
+</p>
+<p>
+  All four configs show pretty severe overfitting — training loss drops below 0.2 while
+  validation loss stays above 4.0. Given that we're only working with 600–1200 ten-token
+  sentence pairs, I think that's expected behavior.
+</p>
+
+<!-- ------------------------------------------------------------ -->
+<h3>Task 2 – Attention Visualization</h3>
+
+<p>
+  I used the best model (Config 4) to translate three sentences.
+  Each heatmap shows attention weights: rows are predicted tokens, columns are source tokens.
+</p>
+<div class="img-row">
+  <img src="images/attention_sent1.png" alt="go ."/>
+  <img src="images/attention_sent2.png" alt="i lost ."/>
+  <img src="images/attention_sent3.png" alt="he is young ."/>
+</div>
+
+<h3>Discussion</h3>
+<p>
+  <strong>"go ." → "va !":</strong> The attention here is very clean — the model focuses on
+  "go" when predicting "va" and shifts to "." when predicting "!". It's basically a diagonal
+  pattern, which makes sense for such a short, direct sentence.
+</p>
+<p>
+  <strong>"i lost ." → "j'ai perdu .":</strong> This one is more interesting. The model
+  attends to both "i" and "lost" together when generating "j'ai perdu", which suggests it
+  learned to handle the French contraction as a combined unit rather than a word-by-word
+  mapping.
+</p>
+<p>
+  <strong>"he is young ." → "il est &lt;unk&gt; .":</strong> "young" didn't appear at least
+  twice in the 600 training examples, so it never made it into the vocabulary (min_freq=2).
+  At inference time it gets replaced with &lt;unk&gt;. Even so, the model still put attention
+  on the right source position, which shows the attention mechanism is working correctly —
+  it just can't output a word it was never taught.
+</p>
+
+<!-- ============================================================ -->
+<h2>Part 2: Multi-Head Attention</h2>
+<!-- ============================================================ -->
+
+<h3>Task 1 – Multi-Head Attention Performance</h3>
+
+<div class="note">
+  All multi-head models use the same base config as Part 1 Config 1 (600 examples,
+  embed=32, hidden=64) so the comparison is fair. Config 4 from Part 1 scored higher
+  because of more data, not the attention type.
+</div>
+
+<table>
+  <tr><th>Model</th><th>Heads</th><th>BLEU</th><th>Train Loss</th><th>Val Loss</th></tr>
+  <tr><td>Bahdanau – Part 1 Config 1 (reference)</td><td>–</td><td>0.1500</td><td>0.1786</td><td>4.8851</td></tr>
+  <tr><td>MultiHead – 1 head</td><td>1</td><td>0.1500</td><td>0.1873</td><td>4.8989</td></tr>
+  <tr><td>MultiHead – 2 heads</td><td>2</td><td>0.1500</td><td>0.1926</td><td>5.7476</td></tr>
+  <tr class="best"><td>MultiHead – 4 heads ★</td><td>4</td><td>0.1500</td><td>0.1893</td><td>5.5348</td></tr>
+  <tr><td>MultiHead – 8 heads</td><td>8</td><td>0.1500</td><td>0.1964</td><td>4.7453</td></tr>
+</table>
+
+<div class="img-row">
+  <img src="images/MultiHead_1h_loss.png" alt="1 head loss"/>
+  <img src="images/MultiHead_2h_loss.png" alt="2 heads loss"/>
+  <img src="images/MultiHead_4h_loss.png" alt="4 heads loss"/>
+  <img src="images/MultiHead_8h_loss.png" alt="8 heads loss"/>
+</div>
+<img src="images/bleu_vs_heads.png" alt="BLEU vs number of heads"/>
+
+<h3>Discussion</h3>
+<p>
+  On this small dataset, all multi-head variants (1/2/4/8 heads) scored the same BLEU of
+  0.1500, matching the Bahdanau reference. So multi-head attention didn't hurt, but didn't
+  clearly win either. I think the advantages become more visible on larger datasets and
+  longer sequences where having multiple attention views really matters.
+</p>
+<p>
+  The tie across all head counts is partly a resolution issue — with only 20 test sentences,
+  BLEU scores only change in steps of 0.05. Looking at validation loss, the different head
+  counts do show different overfitting patterns. With hidden size 64, 8 heads gives only 8
+  dimensions per head which is very tight, so I'd still pick 4 heads as the most balanced
+  choice for this model size.
+</p>
+
+<!-- ------------------------------------------------------------ -->
+<h3>Task 2 – Attention Head Analysis</h3>
+
+<p><strong>Sentence 1: "go ."</strong></p>
+<div class="img-row">
+  <img src="images/MultiHead_4h_sent1_heads.png"   alt="4-head step 1, sent 1"/>
+  <img src="images/MultiHead_4h_sent1_fullseq.png" alt="4-head full seq, sent 1"/>
+</div>
+
+<p><strong>Sentence 2: "i lost ."</strong></p>
+<div class="img-row">
+  <img src="images/MultiHead_4h_sent2_heads.png"   alt="4-head step 1, sent 2"/>
+  <img src="images/MultiHead_4h_sent2_fullseq.png" alt="4-head full seq, sent 2"/>
+</div>
+
+<p><strong>Sentence 3: "he is young ."</strong></p>
+<div class="img-row">
+  <img src="images/MultiHead_4h_sent3_heads.png"   alt="4-head step 1, sent 3"/>
+  <img src="images/MultiHead_4h_sent3_fullseq.png" alt="4-head full seq, sent 3"/>
+</div>
+
+<h3>Discussion</h3>
+<p>
+  Yes, different heads do attend to different parts of the source — some heads are sharply
+  focused on a single token while others spread attention more evenly. This shows the model
+  is learning different perspectives on the same input in parallel, which is the whole point
+  of multi-head attention.
+</p>
+<p>
+  On the short "go ." sentence the differences between heads are subtle since there are only
+  two tokens to divide attention over. On longer sentences like "he is young .", you can see
+  more specialization — some heads seem to track content words while others lean toward
+  punctuation. There's some redundancy across heads too, which I think is expected given
+  how small the hidden size is.
+</p>
+
+<!-- ============================================================ -->
+<h2>Part 3: Transformer Architecture (Extra Credit)</h2>
+<!-- ============================================================ -->
+
+<h3>Task 1 – Transformer Model Comparison</h3>
+
+<div class="note">
+  All three models use the same 600 examples and are trained for 200 epochs for a fair comparison.
+</div>
+
+<table>
+  <tr><th>Model</th><th>BLEU</th><th>Train Loss</th><th>Val Loss</th></tr>
+  <tr class="best"><td>Transformer ★</td><td>0.2000</td><td>0.2617</td><td>4.5132</td></tr>
+  <tr><td>Seq2Seq + Bahdanau (Part 1)</td><td>0.1500</td><td>0.1881</td><td>5.2953</td></tr>
+  <tr><td>Seq2Seq + Multi-Head 4h (Part 2)</td><td>0.1500</td><td>0.2008</td><td>4.8452</td></tr>
+</table>
+
+<div class="img-row">
+  <img src="images/Transformer_baseline_loss.png"      alt="Transformer loss"/>
+  <img src="images/Bahdanau_for_comparison_loss.png"   alt="Bahdanau loss"/>
+  <img src="images/MultiHead4_for_comparison_loss.png" alt="MultiHead4 loss"/>
+</div>
+<img src="images/all_models_loss.png"  alt="All models loss comparison"/>
+<img src="images/bleu_comparison.png"  alt="BLEU comparison"/>
+
+<h3>Discussion</h3>
+<p>
+  The Transformer clearly came out on top with BLEU=0.2000, compared to 0.1500 for both
+  Bahdanau and the Multi-Head GRU. It also had the lowest validation loss (4.51), so it's
+  not just memorizing — it actually generalizes better on this dataset.
+</p>
+<p>
+  I think the main reason it works better is that the Transformer's encoder uses self-attention,
+  so every token can directly relate to every other token in one step. With a GRU encoder,
+  information has to travel through sequential hidden states, and that can lose context over
+  longer sequences. The Transformer decoder also benefits from causal self-attention over its
+  own outputs, giving it a richer context at each decoding step.
+</p>
+<p>
+  What surprised me is that the Transformer was already winning even with just 600 training
+  examples and 200 epochs. I'd expect the gap to be even larger on bigger datasets where the
+  GRU's sequential bottleneck would become a more serious limitation.
+</p>
+
+<!-- ------------------------------------------------------------ -->
+<h3>Task 2 – Ablation Study</h3>
+
+<table>
+  <tr><th>Model</th><th>BLEU</th><th>Train Loss</th><th>Val Loss</th></tr>
+  <tr><td>Transformer (full baseline)</td><td>0.2000</td><td>0.2617</td><td>4.5132</td></tr>
+  <tr><td>No Positional Encoding</td><td>0.2000</td><td>0.2458</td><td>4.6688</td></tr>
+  <tr><td>No Self-Attention</td><td>0.1500</td><td>0.2825</td><td>4.6876</td></tr>
+</table>
+
+<div class="img-row">
+  <img src="images/Transformer_no_pos_enc_loss.png"   alt="No pos enc loss"/>
+  <img src="images/Transformer_no_self_attn_loss.png" alt="No self-attn loss"/>
+</div>
+
+<h3>Discussion</h3>
+<p>
+  <strong>No Positional Encoding (BLEU: 0.2000):</strong> Removing positional encoding
+  matched the full model exactly. With sequences of only 10 tokens, word order seems
+  recoverable enough from cross-attention alone. The training loss was also slightly lower
+  (0.2458 vs 0.2617), suggesting less overfitting without it. On longer sequences I'd
+  expect positional encoding to become essential.
+</p>
+<p>
+  <strong>No Self-Attention (BLEU: 0.1500):</strong> This had the clearest negative effect —
+  BLEU dropped from 0.2000 to 0.1500 and training loss was higher and less stable (0.2825
+  vs 0.2617). Without self-attention, each token in the encoder can't relate to the rest of
+  the sequence within the same layer. This confirms that self-attention is the most critical
+  component of the Transformer, at least at this scale.
+</p>
+
+</body>
+</html>
